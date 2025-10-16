@@ -2,7 +2,7 @@
 
 SensitiveStrings are a conceptual type for strings containing
 _secrets_, which are values that you don't want to _accidentally_
-persist. Accidental persistence happens, for example when you JSON
+persist. Accidental persistence happens, for example, when you JSON
 encode objects containing a secret without stopping to think about the
 fact that there is a secret there.
 
@@ -18,7 +18,7 @@ A better example:
 ```typescript
 const credentials = { username: SensitiveString.Sensitive("earlye@gmail.com"), password: SensitiveString.Sensitive("2CBD047F-005C-4DC6-AE66-5B9D8C1E709F") };
 // later
-console.log( credentials ) // WELL, THAT'S NOT GOOD.
+console.log( credentials ) // {username: "SHA...", password: "SHA..."}
 ```
 
 This repo is intended to house a collection of SensitiveString
