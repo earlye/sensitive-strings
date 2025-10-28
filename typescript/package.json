@@ -13,12 +13,12 @@
   "license": "ISC",
   "packageManager": "pnpm@10.18.1",
   "dependencies": {
-    "@types/node": "^24.8.0",
-    "typescript": "^5.9.3"
   },
   "devDependencies": {
     "@types/lodash": "^4.17.20",
+    "@types/node": "^24.8.0",
     "lodash": "^4.17.21",
+    "typescript": "^5.9.3",
     "yaml": "^2.8.1"
   }
 }
