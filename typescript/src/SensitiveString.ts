@@ -4,6 +4,8 @@ import crypto from 'crypto';
 import util from 'node:util';
 import assert from 'node:assert';
 
+const VALUE_SYMBOL = Symbol('SensitiveStringValue');
+
 function sha256(content:string): string {
   return crypto.createHash('sha256').update(content, "utf8").digest('hex');
 }
@@ -11,12 +13,12 @@ function sha256(content:string): string {
 type JSONReplacer = (key: string, value: any) => any;
 
 export class SensitiveString {
-  #value: string;
+  [VALUE_SYMBOL]: string;
   constructor(value:string) {
-    this.#value = value;
+    this[VALUE_SYMBOL] = value;
   }
   toString(): string {
-    return "sha256:" + sha256(this.#value);
+    return "sha256:" + sha256(this[VALUE_SYMBOL]);
   }
   toLocaleString(): string {
     return this.toString();
@@ -28,10 +30,10 @@ export class SensitiveString {
     return this.toString();
   }
   getValue(): string {
-    return this.#value;
+    return this[VALUE_SYMBOL];
   }
   get length(): number {
-    return this.#value.length;
+    return this[VALUE_SYMBOL].length;
   }
   /**
    * IsSensitiveString returns true if and only if `input` is a
@@ -87,12 +89,11 @@ export class SensitiveString {
     return new SensitiveString(input);
   }
 
-
-  /// UnsecuredJSONReplacer is a JSONReplacer function that will
+  /// PlaintextReplacer is a JSONReplacer function that will
   /// extract the plaintext value of any SensitiveString objects
   /// during json serialization so that you can serialize secrets if
   /// you explicitly want to.
-  static UnsecuredJSONReplacer(replacerFunction : JSONReplacer | undefined = undefined) : JSONReplacer {
+  static PlaintextReplacer(replacerFunction : JSONReplacer | undefined = undefined) : JSONReplacer {
     const otherReplacerFunction = replacerFunction === undefined ?
       (key : string , value: any ): any => value :
       replacerFunction;
