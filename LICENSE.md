@@ -12,4 +12,5 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 # ATTRIBUTIONS:
 
+* The typescript implementation started as a javascript distribution published under MIT license by Earnest LLC, [here](https://www.npmjs.com/package/@earnest-labs/ts-sensitivestring). We re-implemented the typings; made it less dependent on nodejs; added test coverage for packages including lodash and yaml; and made sure it has zero dependencies.
 * We embed portions of the npm package @noble/hashes, which is also provided under the MIT license. See typescript/src/noble-hashes to find the portions we embed.
