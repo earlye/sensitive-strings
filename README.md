@@ -17,7 +17,7 @@ const credentials = { username: SensitiveString.Sensitive("someone@gmail.com"), 
 console.log( credentials ) // {username: "SHA...", password: "SHA..."}
 ```
 
-This repo is intended to house a collection of SensitiveString implementations in various languages.  We start with typescript, and in past day-jobs have implemented SensitiveString in a wide array of languages including Go, Python, and C++.
+This repo is intended to house a collection of SensitiveString implementations in various languages (think of it as a SensitiveString Rosetta Stone).  We start with typescript, and in past day-jobs have implemented SensitiveString in a wide array of languages including Go, Python, and C++.
 
 The main idea is that writing a SensitiveString instance to some persistent location (database, stdout, some JSON string, etc) should BY DEFAULT actually write a sha256 hash for the underlying value, so that you can (a) see that there is a SensitiveString, and (b) if necessary, write a known value locally in order to compare the sha against what you're seeing in logs. The reason for (b) is that sometimes it's useful to be able to see the hashed value for debugging purposes.
 
