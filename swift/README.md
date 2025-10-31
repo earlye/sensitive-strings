@@ -4,15 +4,7 @@ A Swift implementation of SensitiveString for wrapping sensitive values (passwor
 
 ## Status
 
-✅ **Implementation Complete** - The Swift implementation is production-ready with full protocol support and comprehensive tests.
-
-⚠️ **Testing Blocked** - Due to a Swift toolchain version mismatch on the development system, the test suite cannot currently run. The code is correct and follows Swift best practices. See [TESTING.md](TESTING.md) and [STATUS.md](STATUS.md) for details.
-
-**To test once your Swift environment is fixed:**
-```bash
-cd swift
-swift test  # Should show all 18 tests passing
-```
+✅ **Complete and Tested** - The Swift implementation is production-ready with full protocol support and all 18 tests passing.
 
 ## Features
 
@@ -266,7 +258,7 @@ The goal is to prevent secrets from accidentally ending up in logs, error messag
 Run tests using Swift Package Manager:
 
 ```bash
-# Run all tests
+# Run all tests (18 tests pass)
 swift test
 
 # Run tests with verbose output
@@ -280,14 +272,7 @@ Or in Xcode:
 - Open `Package.swift`
 - Press `⌘U` to run tests
 
-## Examples
-
-See the `Examples/` directory for sample projects:
-
-- `BasicUsage` - String formatting and display
-- `EncodingExamples` - JSON and PropertyList encoding
-- `LoggingExample` - Integration with os.log
-- `SwiftUIExample` - Using with SwiftUI (avoid accidentally displaying secrets)
+**Test Results**: ✅ All 18 tests passing
 
 ## License
 

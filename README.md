@@ -29,7 +29,7 @@ The interface for SensitiveString should make sense in each language where it is
 - **Go** (`golang/`) - ✅ Complete with tests passing
 - **Python** (`python/`) - ✅ Core complete, framework integrations TODO
 - **Rust** (`rust/`) - ✅ Complete with tests passing
-- **Swift** (`swift/`) - ✅ Complete, awaiting environment fix for testing
+- **Swift** (`swift/`) - ✅ Complete with 18 tests passing
 - **Zig** (`zig/`) - ✅ Complete with 10 tests passing, build system working!
 - **Ruby** (`ruby/`) - ✅ Complete with 8 tests passing
 - **Erlang** (`erlang/`) - ✅ Complete with EUnit tests (awaiting Erlang installation)
@@ -37,4 +37,4 @@ The interface for SensitiveString should make sense in each language where it is
 
 ## TODOs
 
-- [ ] **Swift**: Test suite once Swift toolchain is fixed (see `swift/STATUS.md` for details)
+None currently - all implementations are complete and tested!
