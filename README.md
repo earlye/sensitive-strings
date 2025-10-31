@@ -22,3 +22,16 @@ This repo is intended to house a collection of SensitiveString implementations i
 The main idea is that writing a SensitiveString instance to some persistent location (database, stdout, some JSON string, etc) should BY DEFAULT actually write a sha256 hash for the underlying value, so that you can (a) see that there is a SensitiveString, and (b) if necessary, write a known value locally in order to compare the sha against what you're seeing in logs. The reason for (b) is that sometimes it's useful to be able to see the hashed value for debugging purposes.
 
 The interface for SensitiveString should make sense in each language where it is implemented, so this doc won't detail that interface. See the code for the specific language implementation you're interested in.
+
+## Current Implementations
+
+- **TypeScript** (`typescript/`) - ✅ Complete with tests passing
+- **Go** (`golang/`) - ✅ Complete with tests passing
+- **Python** (`python/`) - ✅ Core complete, framework integrations TODO
+- **Rust** (`rust/`) - ✅ Complete with tests passing
+- **Swift** (`swift/`) - ✅ Complete, awaiting environment fix for testing
+- **Zig** (`zig/`) - ✅ Complete with 10 tests passing, build system working!
+
+## TODOs
+
+- [ ] **Swift**: Test suite once Swift toolchain is fixed (see `swift/STATUS.md` for details)
