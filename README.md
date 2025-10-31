@@ -31,6 +31,9 @@ The interface for SensitiveString should make sense in each language where it is
 - **Rust** (`rust/`) - ✅ Complete with tests passing
 - **Swift** (`swift/`) - ✅ Complete, awaiting environment fix for testing
 - **Zig** (`zig/`) - ✅ Complete with 10 tests passing, build system working!
+- **Ruby** (`ruby/`) - ✅ Complete with 8 tests passing
+- **Erlang** (`erlang/`) - ✅ Complete with EUnit tests (awaiting Erlang installation)
+- **PHP** (`php/`) - ✅ Complete with 14 tests passing
 
 ## TODOs
 

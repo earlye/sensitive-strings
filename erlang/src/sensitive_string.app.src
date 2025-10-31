@@ -1,0 +1,11 @@
+{application, sensitive_string,
+ [{description, "A wrapper for sensitive string values that prevents accidental exposure"},
+  {vsn, "0.1.0"},
+  {registered, []},
+  {applications, [kernel, stdlib, crypto]},
+  {env,[]},
+  {modules, []},
+  {licenses, ["MIT"]},
+  {links, [{"GitHub", "https://github.com/earlye/sensitive-strings"}]}
+ ]}.
+

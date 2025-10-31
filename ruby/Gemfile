@@ -1,0 +1,14 @@
+# frozen_string_literal: true
+
+source 'https://rubygems.org'
+
+ruby '>= 2.6.0'
+
+group :development, :test do
+  gem 'rspec', '~> 3.12'
+  gem 'rubocop', '~> 1.50', require: false
+end
+
+# Optional: for ActiveSupport integration testing
+# gem 'activesupport', '~> 7.0'
+

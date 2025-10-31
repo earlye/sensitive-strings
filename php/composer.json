@@ -1,0 +1,32 @@
+{
+    "name": "earlye/sensitive-string",
+    "description": "A wrapper for sensitive string values that prevents accidental exposure",
+    "type": "library",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Earl Youngblood",
+            "email": "you@example.com"
+        }
+    ],
+    "require": {
+        "php": ">=7.4"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^9.5"
+    },
+    "autoload": {
+        "psr-4": {
+            "SensitiveString\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "SensitiveString\\Tests\\": "tests/"
+        }
+    },
+    "scripts": {
+        "test": "phpunit"
+    }
+}
+
