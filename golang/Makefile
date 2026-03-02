@@ -9,9 +9,8 @@ SHELL=/bin/bash -euo pipefail
 DECOLOR:=$(shell ./decolor.sh)
 
 $(info Entering directory `$(shell pwd)') # '`
-$(info DECOLOR: $(DECOLOR))
 
-all: bin/sensitive-string
+all: bin/SensitiveString
 
 .PHONY: test
 test: 
@@ -38,11 +37,8 @@ dependencies:
 	go install github.com/gregoryv/uncover/cmd/uncover@b56b18c8233ef7a454eed0c045ecf19b30da36dd
 	touch $@
 
-bin/sensitive-string: test $(GOFILES) go.mod Makefile
-	GOOS=darwin && \
-	go version && \
-	go build -buildvcs=false -ldflags="-X 'sensitive-string/consts.Version=$(SEMVER)$(VERTAG)'" -o "$(abspath $@)"
-	test -f "$(abspath $@)"
+bin/SensitiveString: $(GOFILES) go.mod Makefile
+	go build -buildvcs=false -o "$(abspath $@)" ./cli/
 	chmod +x "$(abspath $@)"
 
 .coverage.html: .coverage.out 
@@ -54,3 +50,16 @@ bin/sensitive-string: test $(GOFILES) go.mod Makefile
 
 .coverage.out.tmp: $(GOFILES)
 	go test -v ./... -count=1 -coverprofile=$(notdir $@) | sed "s/^coverage:/coverage :/g"
+
+.PHONY: link
+link: bin/SensitiveString
+	mkdir -p $(HOME)/.bin
+	ln -sf $(abspath $<) $(HOME)/.bin/SensitiveString
+
+.PHONY: unlink
+unlink:
+	rm -f $(HOME)/.bin/SensitiveString
+
+.PHONY: clean
+clean: unlink
+	rm -rf bin/*
