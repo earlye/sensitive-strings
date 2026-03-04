@@ -1,0 +1,510 @@
+package sensitivestring
+
+import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"log/slog"
+	"strings"
+	"testing"
+
+	"gopkg.in/yaml.v3"
+)
+
+// TestNew_af5a2178 verifies basic creation and hiding of values
+func TestNew_af5a2178(t *testing.T) {
+	ss := New("foo")
+	expected := "sha256:2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae"
+
+	if got := ss.String(); got != expected {
+		t.Errorf("String() = %v, want %v", got, expected)
+	}
+
+	// Test string formatting (equivalent to template literals in JS)
+	formatted := fmt.Sprintf("%s", ss)
+	if formatted != expected {
+		t.Errorf("fmt.Sprintf(%%s) = %v, want %v", formatted, expected)
+	}
+
+	formatted = fmt.Sprintf("%v", ss)
+	if formatted != expected {
+		t.Errorf("fmt.Sprintf(%%v) = %v, want %v", formatted, expected)
+	}
+}
+
+// TestValue_af5a2178 verifies explicit value access
+func TestValue_af5a2178(t *testing.T) {
+	ss := New("foo")
+
+	if got := ss.Value(); got != "foo" {
+		t.Errorf("Value() = %v, want %v", got, "foo")
+	}
+}
+
+// TestJSONMarshal_af5a2178 verifies JSON serialization hides the value
+func TestJSONMarshal_af5a2178(t *testing.T) {
+	ss := New("foo")
+	expected := "sha256:2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae"
+
+	obj := map[string]interface{}{
+		"ss": ss,
+		"b":  "c",
+	}
+
+	jsonBytes, err := json.Marshal(obj)
+	if err != nil {
+		t.Fatalf("json.Marshal() error = %v", err)
+	}
+
+	jsonStr := string(jsonBytes)
+	if !strings.Contains(jsonStr, expected) {
+		t.Errorf("JSON output should contain hash, got: %v", jsonStr)
+	}
+
+	if strings.Contains(jsonStr, "foo") && !strings.Contains(jsonStr, "sha256") {
+		t.Errorf("JSON output leaked raw value: %v", jsonStr)
+	}
+}
+
+// TestExtractValue_666e8222 verifies ExtractValue can get values
+func TestExtractValue_666e8222(t *testing.T) {
+	ss := New("foo")
+	s := "notfoo"
+
+	val, ok := ExtractValue(ss)
+	if !ok || val != "foo" {
+		t.Errorf("ExtractValue(ss) = (%v, %v), want (foo, true)", val, ok)
+	}
+
+	val, ok = ExtractValue(s)
+	if !ok || val != "notfoo" {
+		t.Errorf("ExtractValue(s) = (%v, %v), want (notfoo, true)", val, ok)
+	}
+
+	val, ok = ExtractValue(nil)
+	if ok {
+		t.Errorf("ExtractValue(nil) = (%v, %v), want (empty, false)", val, ok)
+	}
+}
+
+// TestExtractRequiredValue_3325a6ad verifies ExtractRequiredValue can get values
+func TestExtractRequiredValue_3325a6ad(t *testing.T) {
+	ss := New("foo")
+	s := "notfoo"
+
+	if got := ExtractRequiredValue(ss); got != "foo" {
+		t.Errorf("ExtractRequiredValue(ss) = %v, want foo", got)
+	}
+
+	if got := ExtractRequiredValue(s); got != "notfoo" {
+		t.Errorf("ExtractRequiredValue(s) = %v, want notfoo", got)
+	}
+
+	// Test panic case
+	defer func() {
+		if r := recover(); r == nil {
+			t.Errorf("ExtractRequiredValue(nil) should panic")
+		}
+	}()
+	ExtractRequiredValue(nil)
+}
+
+// TestSensitive_a23eb5b8 verifies Sensitive can create SensitiveString from various types
+func TestSensitive_a23eb5b8(t *testing.T) {
+	ss := New("foo")
+	s := "notfoo"
+
+	result := Sensitive(ss)
+	if result != ss {
+		t.Errorf("Sensitive(ss) should return same instance")
+	}
+
+	result = Sensitive(s)
+	if result.Value() != "notfoo" {
+		t.Errorf("Sensitive(s).Value() = %v, want notfoo", result.Value())
+	}
+
+	result = Sensitive(nil)
+	if result != nil {
+		t.Errorf("Sensitive(nil) = %v, want nil", result)
+	}
+}
+
+// testStringer is a helper type that implements fmt.Stringer for use in tests.
+type testStringer struct{ val string }
+
+func (ts testStringer) String() string { return ts.val }
+
+// TestSensitive_Stringer_c4e91f3a verifies Sensitive uses the String() method for fmt.Stringer inputs
+func TestSensitive_Stringer_c4e91f3a(t *testing.T) {
+	input := testStringer{val: "stringer-value"}
+	result := Sensitive(input)
+	if got := result.Value(); got != "stringer-value" {
+		t.Errorf("Sensitive(fmt.Stringer).Value() = %q, want %q", got, "stringer-value")
+	}
+}
+
+// TestSensitive_Default_d82b0e71 verifies Sensitive falls back to fmt.Sprintf for unknown types
+func TestSensitive_Default_d82b0e71(t *testing.T) {
+	result := Sensitive(42)
+	if got := result.Value(); got != "42" {
+		t.Errorf("Sensitive(42).Value() = %q, want %q", got, "42")
+	}
+
+	result = Sensitive(3.14)
+	if got := result.Value(); got != "3.14" {
+		t.Errorf("Sensitive(3.14).Value() = %q, want %q", got, "3.14")
+	}
+}
+
+// TestIsSensitiveString_a23eb5b8 verifies IsSensitiveString detection
+func TestIsSensitiveString_a23eb5b8(t *testing.T) {
+	ss := New("foo")
+	s := "notfoo"
+
+	if !IsSensitiveString(ss) {
+		t.Errorf("IsSensitiveString(ss) = false, want true")
+	}
+
+	if IsSensitiveString(s) {
+		t.Errorf("IsSensitiveString(s) = true, want false")
+	}
+
+	if IsSensitiveString(nil) {
+		t.Errorf("IsSensitiveString(nil) = true, want false")
+	}
+}
+
+// TestLen_088caed0 verifies length access
+func TestLen_088caed0(t *testing.T) {
+	ss := New("foo")
+	if got := ss.Len(); got != 3 {
+		t.Errorf("Len() = %v, want 3", got)
+	}
+}
+
+// TestNilSensitiveString verifies nil pointer handling for pointer-receiver methods.
+// String(), GoString(), MarshalJSON(), MarshalYAML(), and LogValue() use value
+// receivers and cannot be called safely on a nil pointer — that is expected Go
+// behavior. Only the pointer-receiver methods (Value, PValue, Len) need nil guards.
+func TestNilSensitiveString(t *testing.T) {
+	var ss *SensitiveString
+
+	if got := ss.Value(); got != "" {
+		t.Errorf("nil.Value() = %v, want empty string", got)
+	}
+
+	if got := ss.Len(); got != 0 {
+		t.Errorf("nil.Len() = %v, want 0", got)
+	}
+}
+
+// Test455A1E09_StringFormatting verifies string formatting doesn't leak
+func Test455A1E09_StringFormatting(t *testing.T) {
+	ss := New("secret123")
+
+	// Test various formatting verbs
+	tests := []struct {
+		format string
+		name   string
+	}{
+		{"%s", "string"},
+		{"%v", "default"},
+		{"%+v", "verbose"},
+		{"%#v", "Go-syntax"},
+		{"%q", "quoted"},
+	}
+
+	for _, tt := range tests {
+		result := fmt.Sprintf(tt.format, ss)
+		if strings.Contains(result, "secret123") && !strings.Contains(result, "sha256") {
+			t.Errorf("fmt.Sprintf(%s) leaked raw value: %v", tt.name, result)
+		}
+		t.Logf("%s formatting: %s", tt.name, result)
+	}
+}
+
+// Test458ECC56_StructSerialization verifies struct fields don't leak
+func Test458ECC56_StructSerialization(t *testing.T) {
+	type Credentials struct {
+		Username string           `json:"username"`
+		Password *SensitiveString `json:"password"`
+	}
+
+	creds := Credentials{
+		Username: "user123",
+		Password: New("secret789"),
+	}
+
+	jsonBytes, err := json.Marshal(creds)
+	if err != nil {
+		t.Fatalf("json.Marshal() error = %v", err)
+	}
+
+	jsonStr := string(jsonBytes)
+	t.Logf("JSON serialization: %s", jsonStr)
+
+	if strings.Contains(jsonStr, "secret789") && !strings.Contains(jsonStr, "sha256") {
+		t.Errorf("JSON serialization leaked raw password value")
+	}
+
+	if !strings.Contains(jsonStr, "sha256:") {
+		t.Errorf("JSON serialization should contain sha256 hash")
+	}
+}
+
+// TestC9D43D4F_YAML verifies YAML serialization doesn't leak
+func TestC9D43D4F_YAML(t *testing.T) {
+	type Config struct {
+		Username string           `yaml:"username"`
+		Password *SensitiveString `yaml:"password"`
+		Nested   struct {
+			APIKey *SensitiveString `yaml:"apiKey"`
+		} `yaml:"nested"`
+	}
+
+	config := Config{
+		Username: "testuser",
+		Password: New("secretYaml"),
+	}
+	config.Nested.APIKey = New("secretApiKey")
+
+	yamlBytes, err := yaml.Marshal(config)
+	if err != nil {
+		t.Fatalf("yaml.Marshal() error = %v", err)
+	}
+
+	yamlStr := string(yamlBytes)
+	t.Logf("YAML serialization:\n%s", yamlStr)
+
+	if strings.Contains(yamlStr, "secretYaml") && !strings.Contains(yamlStr, "sha256") {
+		t.Errorf("YAML serialization leaked password raw value")
+	}
+
+	if strings.Contains(yamlStr, "secretApiKey") && !strings.Contains(yamlStr, "sha256") {
+		t.Errorf("YAML serialization leaked apiKey raw value")
+	}
+
+	if !strings.Contains(yamlStr, "sha256:") {
+		t.Errorf("YAML serialization should contain sha256 hash")
+	}
+}
+
+// Test404A48D7_YAML verifies PlaintextReplacer with YAML
+func Test404A48D7_YAML(t *testing.T) {
+	obj := map[string]interface{}{
+		"username": "testuser",
+		"password": New("secretYamlUnsecured"),
+		"nested": map[string]interface{}{
+			"apiKey": New("secretUnsecuredApiKey"),
+		},
+	}
+
+	// Apply PlaintextReplacer before marshaling
+	plainObj := PlaintextReplacer(obj)
+
+	yamlBytes, err := yaml.Marshal(plainObj)
+	if err != nil {
+		t.Fatalf("yaml.Marshal() error = %v", err)
+	}
+
+	yamlStr := string(yamlBytes)
+	t.Logf("YAML with PlaintextReplacer:\n%s", yamlStr)
+
+	if !strings.Contains(yamlStr, "secretYamlUnsecured") {
+		t.Errorf("YAML with PlaintextReplacer should include password raw value")
+	}
+
+	if !strings.Contains(yamlStr, "secretUnsecuredApiKey") {
+		t.Errorf("YAML with PlaintextReplacer should include apiKey raw value")
+	}
+
+	if strings.Contains(yamlStr, "sha256:") {
+		t.Errorf("YAML with PlaintextReplacer should NOT contain sha256 hash")
+	}
+}
+
+// TestPlaintextReplacer_JSON verifies PlaintextReplacer with JSON
+func TestPlaintextReplacer_JSON(t *testing.T) {
+	obj := map[string]interface{}{
+		"username": "testuser",
+		"password": New("secretJSON"),
+		"nested": map[string]interface{}{
+			"apiKey": New("secretNestedJSON"),
+		},
+		"array": []interface{}{
+			New("secretInArray"),
+			"normalString",
+		},
+	}
+
+	// Normal serialization (should hash)
+	normalBytes, err := json.Marshal(obj)
+	if err != nil {
+		t.Fatalf("json.Marshal() error = %v", err)
+	}
+	normalStr := string(normalBytes)
+	t.Logf("Normal JSON: %s", normalStr)
+
+	if strings.Contains(normalStr, "secretJSON") && !strings.Contains(normalStr, "sha256") {
+		t.Errorf("Normal JSON serialization leaked raw value")
+	}
+
+	// PlaintextReplacer serialization (should expose)
+	plainObj := PlaintextReplacer(obj)
+	plainBytes, err := json.Marshal(plainObj)
+	if err != nil {
+		t.Fatalf("json.Marshal(PlaintextReplacer) error = %v", err)
+	}
+	plainStr := string(plainBytes)
+	t.Logf("Plaintext JSON: %s", plainStr)
+
+	if !strings.Contains(plainStr, "secretJSON") {
+		t.Errorf("PlaintextReplacer JSON should include password raw value")
+	}
+
+	if !strings.Contains(plainStr, "secretNestedJSON") {
+		t.Errorf("PlaintextReplacer JSON should include nested apiKey raw value")
+	}
+
+	if !strings.Contains(plainStr, "secretInArray") {
+		t.Errorf("PlaintextReplacer JSON should include array secret raw value")
+	}
+
+	if strings.Contains(plainStr, "sha256:") {
+		t.Errorf("PlaintextReplacer JSON should NOT contain sha256 hash")
+	}
+}
+
+// TestPValue_SetValue_b3f7a92c verifies that setting via PValue() is reflected in Value()
+func TestPValue_SetValue_b3f7a92c(t *testing.T) {
+	ss := New("initial")
+
+	*ss.PValue() = "foo"
+
+	if got := ss.Value(); got != "foo" {
+		t.Errorf("Value() after *PValue() = %q = %q, want %q", "foo", got, "foo")
+	}
+}
+
+// TestPlaintextReplacer_Nil verifies PlaintextReplacer handles nil correctly
+func TestPlaintextReplacer_Nil(t *testing.T) {
+	var ss *SensitiveString
+	result := PlaintextReplacer(ss)
+	if result != nil {
+		t.Errorf("PlaintextReplacer(nil SensitiveString) = %v, want nil", result)
+	}
+
+	result = PlaintextReplacer(nil)
+	if result != nil {
+		t.Errorf("PlaintextReplacer(nil) = %v, want nil", result)
+	}
+}
+
+// slogTestCreds is a helper struct used by slog tests to simulate a real-world
+// struct containing a sensitive field.
+type slogTestCreds struct {
+	Username string
+	Password *SensitiveString
+}
+
+const slogTestPlaintext = "slog-secret-plaintext"
+
+// TestSlog_TextHandler_DirectAttr verifies TextHandler does not leak plaintext
+// when a *SensitiveString is passed as a direct slog attribute.
+func TestSlog_TextHandler_DirectAttr(t *testing.T) {
+	var buf bytes.Buffer
+	logger := slog.New(slog.NewTextHandler(&buf, nil))
+	logger.Info("test", "secret", New(slogTestPlaintext))
+	if strings.Contains(buf.String(), slogTestPlaintext) {
+		t.Errorf("TextHandler (direct attr) leaked plaintext: %s", buf.String())
+	}
+}
+
+// TestSlog_JSONHandler_DirectAttr verifies JSONHandler does not leak plaintext
+// when a *SensitiveString is passed as a direct slog attribute.
+func TestSlog_JSONHandler_DirectAttr(t *testing.T) {
+	var buf bytes.Buffer
+	logger := slog.New(slog.NewJSONHandler(&buf, nil))
+	logger.Info("test", "secret", New(slogTestPlaintext))
+	if strings.Contains(buf.String(), slogTestPlaintext) {
+		t.Errorf("JSONHandler (direct attr) leaked plaintext: %s", buf.String())
+	}
+}
+
+// TestSlog_TextHandler_StructField verifies TextHandler does not leak plaintext
+// when a *SensitiveString is a field inside a struct passed to slog.
+func TestSlog_TextHandler_StructField(t *testing.T) {
+	var buf bytes.Buffer
+	logger := slog.New(slog.NewTextHandler(&buf, nil))
+	creds := slogTestCreds{Username: "alice", Password: New(slogTestPlaintext)}
+	logger.Info("test", "creds", creds)
+	if strings.Contains(buf.String(), slogTestPlaintext) {
+		t.Errorf("TextHandler (struct field) leaked plaintext: %s", buf.String())
+	}
+}
+
+// TestSlog_JSONHandler_StructField verifies JSONHandler does not leak plaintext
+// when a *SensitiveString is a field inside a struct passed to slog.
+func TestSlog_JSONHandler_StructField(t *testing.T) {
+	var buf bytes.Buffer
+	logger := slog.New(slog.NewJSONHandler(&buf, nil))
+	creds := slogTestCreds{Username: "alice", Password: New(slogTestPlaintext)}
+	logger.Info("test", "creds", creds)
+	if strings.Contains(buf.String(), slogTestPlaintext) {
+		t.Errorf("JSONHandler (struct field) leaked plaintext: %s", buf.String())
+	}
+}
+
+// slogValueCreds is a helper struct with value-type (not pointer) SensitiveString
+// fields, matching the real-world pattern that causes leaks.
+type slogValueCreds struct {
+	Username string
+	Password SensitiveString
+}
+
+// TestSlog_TextHandler_ValueDirectAttr verifies TextHandler does not leak plaintext
+// when a SensitiveString value (not pointer) is passed as a direct slog attribute.
+func TestSlog_TextHandler_ValueDirectAttr(t *testing.T) {
+	var buf bytes.Buffer
+	logger := slog.New(slog.NewTextHandler(&buf, nil))
+	logger.Info("test", "secret", SensitiveString{value: slogTestPlaintext})
+	if strings.Contains(buf.String(), slogTestPlaintext) {
+		t.Errorf("TextHandler (value direct attr) leaked plaintext: %s", buf.String())
+	}
+}
+
+// TestSlog_JSONHandler_ValueDirectAttr verifies JSONHandler does not leak plaintext
+// when a SensitiveString value (not pointer) is passed as a direct slog attribute.
+func TestSlog_JSONHandler_ValueDirectAttr(t *testing.T) {
+	var buf bytes.Buffer
+	logger := slog.New(slog.NewJSONHandler(&buf, nil))
+	logger.Info("test", "secret", SensitiveString{value: slogTestPlaintext})
+	if strings.Contains(buf.String(), slogTestPlaintext) {
+		t.Errorf("JSONHandler (value direct attr) leaked plaintext: %s", buf.String())
+	}
+}
+
+// TestSlog_TextHandler_ValueStructField verifies TextHandler does not leak plaintext
+// when a SensitiveString value (not pointer) is a field inside a struct passed to slog.
+func TestSlog_TextHandler_ValueStructField(t *testing.T) {
+	var buf bytes.Buffer
+	logger := slog.New(slog.NewTextHandler(&buf, nil))
+	creds := slogValueCreds{Username: "alice", Password: SensitiveString{value: slogTestPlaintext}}
+	logger.Info("test", "creds", creds)
+	if strings.Contains(buf.String(), slogTestPlaintext) {
+		t.Errorf("TextHandler (value struct field) leaked plaintext: %s", buf.String())
+	}
+}
+
+// TestSlog_JSONHandler_ValueStructField verifies JSONHandler does not leak plaintext
+// when a SensitiveString value (not pointer) is a field inside a struct passed to slog.
+func TestSlog_JSONHandler_ValueStructField(t *testing.T) {
+	var buf bytes.Buffer
+	logger := slog.New(slog.NewJSONHandler(&buf, nil))
+	creds := slogValueCreds{Username: "alice", Password: SensitiveString{value: slogTestPlaintext}}
+	logger.Info("test", "creds", creds)
+	if strings.Contains(buf.String(), slogTestPlaintext) {
+		t.Errorf("JSONHandler (value struct field) leaked plaintext: %s", buf.String())
+	}
+}
