@@ -46,6 +46,16 @@ func (s *SensitiveString) Value() string {
 	return s.value
 }
 
+// PValue returns a pointer to the raw plaintext value. Use this when you
+// need to pass plaintext value to a function that expects a string pointer.
+// Common example is for Cobra string arguments.
+func (s *SensitiveString) PValue() *string {
+	if s == nil {
+		return nil
+	}
+	return &s.value
+}
+
 // Len returns the length of the underlying value without exposing it.
 func (s *SensitiveString) Len() int {
 	if s == nil {

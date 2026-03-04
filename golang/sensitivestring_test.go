@@ -128,6 +128,33 @@ func TestSensitive_a23eb5b8(t *testing.T) {
 	}
 }
 
+// testStringer is a helper type that implements fmt.Stringer for use in tests.
+type testStringer struct{ val string }
+
+func (ts testStringer) String() string { return ts.val }
+
+// TestSensitive_Stringer_c4e91f3a verifies Sensitive uses the String() method for fmt.Stringer inputs
+func TestSensitive_Stringer_c4e91f3a(t *testing.T) {
+	input := testStringer{val: "stringer-value"}
+	result := Sensitive(input)
+	if got := result.Value(); got != "stringer-value" {
+		t.Errorf("Sensitive(fmt.Stringer).Value() = %q, want %q", got, "stringer-value")
+	}
+}
+
+// TestSensitive_Default_d82b0e71 verifies Sensitive falls back to fmt.Sprintf for unknown types
+func TestSensitive_Default_d82b0e71(t *testing.T) {
+	result := Sensitive(42)
+	if got := result.Value(); got != "42" {
+		t.Errorf("Sensitive(42).Value() = %q, want %q", got, "42")
+	}
+
+	result = Sensitive(3.14)
+	if got := result.Value(); got != "3.14" {
+		t.Errorf("Sensitive(3.14).Value() = %q, want %q", got, "3.14")
+	}
+}
+
 // TestIsSensitiveString_a23eb5b8 verifies IsSensitiveString detection
 func TestIsSensitiveString_a23eb5b8(t *testing.T) {
 	ss := New("foo")
@@ -345,6 +372,17 @@ func TestPlaintextReplacer_JSON(t *testing.T) {
 
 	if strings.Contains(plainStr, "sha256:") {
 		t.Errorf("PlaintextReplacer JSON should NOT contain sha256 hash")
+	}
+}
+
+// TestPValue_SetValue_b3f7a92c verifies that setting via PValue() is reflected in Value()
+func TestPValue_SetValue_b3f7a92c(t *testing.T) {
+	ss := New("initial")
+
+	*ss.PValue() = "foo"
+
+	if got := ss.Value(); got != "foo" {
+		t.Errorf("Value() after *PValue() = %q = %q, want %q", "foo", got, "foo")
 	}
 }
 

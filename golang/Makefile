@@ -44,6 +44,10 @@ bin/SensitiveString: $(GOFILES) go.mod Makefile
 .coverage.html: .coverage.out 
 	go tool cover -html=.coverage.out -o $(abspath $@)
 
+.PHONY: view-coverage
+view-coverage: .coverage.html
+	open $(abspath $<)
+
 .coverage.out: .coverage.out.tmp .uncover
 	./munge-coverage.sh
 	$(HOME)/go/bin/uncover -min 5.0 .coverage.out | $(DECOLOR) 
