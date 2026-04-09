@@ -32,12 +32,12 @@ func TestNew_af5a2178(t *testing.T) {
 	}
 }
 
-// TestValue_af5a2178 verifies explicit value access
-func TestValue_af5a2178(t *testing.T) {
+// TestPlainText_af5a2178 verifies explicit plaintext access
+func TestPlainText_af5a2178(t *testing.T) {
 	ss := New("foo")
 
-	if got := ss.Value(); got != "foo" {
-		t.Errorf("Value() = %v, want %v", got, "foo")
+	if got := ss.PlainText(); got != "foo" {
+		t.Errorf("PlainText() = %v, want %v", got, "foo")
 	}
 }
 
@@ -66,47 +66,132 @@ func TestJSONMarshal_af5a2178(t *testing.T) {
 	}
 }
 
-// TestExtractValue_666e8222 verifies ExtractValue can get values
-func TestExtractValue_666e8222(t *testing.T) {
+// TestUnmarshalJSON verifies UnmarshalJSON stores the JSON string (e.g. a prior hash) as value,
+// that JSON produced via PlaintextReplacer round-trips to the same plaintext secret, and that
+// invalid or non-string JSON surfaces errors from json.Unmarshal.
+func TestUnmarshalJSON(t *testing.T) {
+	hash := "sha256:2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae"
+	payload := []byte(`"` + hash + `"`)
+	var ss SensitiveString
+	if err := json.Unmarshal(payload, &ss); err != nil {
+		t.Fatalf("json.Unmarshal: %v", err)
+	}
+	if got := ss.PlainText(); got != hash {
+		t.Errorf("PlainText() = %q, want %q", got, hash)
+	}
+
+	orig := New("secret")
+	marshaled, err := json.Marshal(orig)
+	if err != nil {
+		t.Fatalf("json.Marshal: %v", err)
+	}
+	var roundtrip SensitiveString
+	if err := json.Unmarshal(marshaled, &roundtrip); err != nil {
+		t.Fatalf("json.Unmarshal round-trip: %v", err)
+	}
+	if got := roundtrip.PlainText(); got != orig.String() {
+		t.Errorf("PlainText() after marshal/unmarshal = %q, want hash string %q", got, orig.String())
+	}
+
+	t.Run("BadJSON", func(t *testing.T) {
+		cases := []struct {
+			name string
+			raw  string
+		}{
+			{"syntax_garbage", "not json"},
+			{"empty", ""},
+			{"truncated_object", "{"},
+			{"number_not_string", "123"},
+			{"bool_not_string", "true"},
+			{"array_not_string", "[1,2,3]"},
+			{"object_not_string", `{"a":1}`},
+		}
+		for _, tc := range cases {
+			t.Run(tc.name, func(t *testing.T) {
+				var ss SensitiveString
+				err := json.Unmarshal([]byte(tc.raw), &ss)
+				if err == nil {
+					t.Fatalf("json.Unmarshal(%q): want error, got nil (PlainText=%q)", tc.raw, ss.PlainText())
+				}
+			})
+		}
+	})
+
+	t.Run("PlaintextReplacer", func(t *testing.T) {
+		secret := "replacer-secret-plaintext"
+		obj := map[string]any{
+			"password": New(secret),
+		}
+		plain := PlaintextReplacer(obj)
+		jsonBytes, err := json.Marshal(plain)
+		if err != nil {
+			t.Fatalf("json.Marshal(PlaintextReplacer(...)): %v", err)
+		}
+
+		type payload struct {
+			Password SensitiveString `json:"password"`
+		}
+		var p payload
+		if err := json.Unmarshal(jsonBytes, &p); err != nil {
+			t.Fatalf("json.Unmarshal: %v", err)
+		}
+		if got := p.Password.PlainText(); got != secret {
+			t.Errorf("PlainText() = %q, want %q (same as pre-replacer secret)", got, secret)
+		}
+	})
+}
+
+// TestExtractPlainText_666e8222 verifies ExtractPlainText can get values
+func TestExtractPlainText_666e8222(t *testing.T) {
 	ss := New("foo")
 	s := "notfoo"
 
-	val, ok := ExtractValue(ss)
+	val, ok := ExtractPlainText(ss)
 	if !ok || val != "foo" {
-		t.Errorf("ExtractValue(ss) = (%v, %v), want (foo, true)", val, ok)
+		t.Errorf("ExtractPlainText(ss) = (%v, %v), want (foo, true)", val, ok)
 	}
 
-	val, ok = ExtractValue(s)
+	val, ok = ExtractPlainText(s)
 	if !ok || val != "notfoo" {
-		t.Errorf("ExtractValue(s) = (%v, %v), want (notfoo, true)", val, ok)
+		t.Errorf("ExtractPlainText(s) = (%v, %v), want (notfoo, true)", val, ok)
 	}
 
-	val, ok = ExtractValue(nil)
+	val, ok = ExtractPlainText(nil)
 	if ok {
-		t.Errorf("ExtractValue(nil) = (%v, %v), want (empty, false)", val, ok)
+		t.Errorf("ExtractPlainText(nil) = (%v, %v), want (empty, false)", val, ok)
+	}
+
+	val, ok = ExtractPlainText(&ss)
+	if !ok || val != "foo" {
+		t.Errorf("ExtractPlainText(&ss) = (%v, %v), want (foo, true)", val, ok)
+	}
+
+	val, ok = ExtractPlainText(42)
+	if ok || val != "" {
+		t.Errorf("ExtractPlainText(42) = (%q, %v), want (\"\", false)", val, ok)
 	}
 }
 
-// TestExtractRequiredValue_3325a6ad verifies ExtractRequiredValue can get values
-func TestExtractRequiredValue_3325a6ad(t *testing.T) {
+// TestExtractRequiredPlainText_3325a6ad verifies ExtractRequiredPlainText can get values
+func TestExtractRequiredPlainText_3325a6ad(t *testing.T) {
 	ss := New("foo")
 	s := "notfoo"
 
-	if got := ExtractRequiredValue(ss); got != "foo" {
-		t.Errorf("ExtractRequiredValue(ss) = %v, want foo", got)
+	if got := ExtractRequiredPlainText(ss); got != "foo" {
+		t.Errorf("ExtractRequiredPlainText(ss) = %v, want foo", got)
 	}
 
-	if got := ExtractRequiredValue(s); got != "notfoo" {
-		t.Errorf("ExtractRequiredValue(s) = %v, want notfoo", got)
+	if got := ExtractRequiredPlainText(s); got != "notfoo" {
+		t.Errorf("ExtractRequiredPlainText(s) = %v, want notfoo", got)
 	}
 
 	// Test panic case
 	defer func() {
 		if r := recover(); r == nil {
-			t.Errorf("ExtractRequiredValue(nil) should panic")
+			t.Errorf("ExtractRequiredPlainText(nil) should panic")
 		}
 	}()
-	ExtractRequiredValue(nil)
+	ExtractRequiredPlainText(nil)
 }
 
 // TestSensitive_a23eb5b8 verifies Sensitive can create SensitiveString from various types
@@ -114,19 +199,36 @@ func TestSensitive_a23eb5b8(t *testing.T) {
 	ss := New("foo")
 	s := "notfoo"
 
-	result := Sensitive(ss)
-	if result != ss {
+	result := Sensitive(&ss)
+	if result != &ss {
 		t.Errorf("Sensitive(ss) should return same instance")
 	}
 
 	result = Sensitive(s)
-	if result.Value() != "notfoo" {
-		t.Errorf("Sensitive(s).Value() = %v, want notfoo", result.Value())
+	if result.PlainText() != "notfoo" {
+		t.Errorf("Sensitive(s).PlainText() = %v, want notfoo", result.PlainText())
 	}
 
 	result = Sensitive(nil)
-	if result != nil {
-		t.Errorf("Sensitive(nil) = %v, want nil", result)
+	if result == nil {
+		t.Errorf("Sensitive(nil) = %v, want empty SensitiveString", result)
+	}
+	if result.PlainText() != "" {
+		t.Errorf("Sensitive(nil).PlainText() = %v, want empty string", result.PlainText())
+	}
+}
+
+// TestSensitive_ValueUsesPlainText verifies Sensitive(SensitiveString value) extracts
+// PlainText(), not String() (SHA256). SensitiveString implements fmt.Stringer; the
+// type switch must match SensitiveString before fmt.Stringer.
+func TestSensitive_ValueUsesPlainText(t *testing.T) {
+	ss := New("foo")
+	out := Sensitive(ss)
+	if out == nil {
+		t.Fatal("Sensitive(value SensitiveString) = nil, want non-nil")
+	}
+	if got := out.PlainText(); got != "foo" {
+		t.Errorf("PlainText() = %q, want %q (if String() were used, this would be a sha256:… hash)", got, "foo")
 	}
 }
 
@@ -139,21 +241,21 @@ func (ts testStringer) String() string { return ts.val }
 func TestSensitive_Stringer_c4e91f3a(t *testing.T) {
 	input := testStringer{val: "stringer-value"}
 	result := Sensitive(input)
-	if got := result.Value(); got != "stringer-value" {
-		t.Errorf("Sensitive(fmt.Stringer).Value() = %q, want %q", got, "stringer-value")
+	if got := result.PlainText(); got != "stringer-value" {
+		t.Errorf("Sensitive(fmt.Stringer).PlainText() = %q, want %q", got, "stringer-value")
 	}
 }
 
 // TestSensitive_Default_d82b0e71 verifies Sensitive falls back to fmt.Sprintf for unknown types
 func TestSensitive_Default_d82b0e71(t *testing.T) {
 	result := Sensitive(42)
-	if got := result.Value(); got != "42" {
-		t.Errorf("Sensitive(42).Value() = %q, want %q", got, "42")
+	if got := result.PlainText(); got != "42" {
+		t.Errorf("Sensitive(42).PlainText() = %q, want %q", got, "42")
 	}
 
 	result = Sensitive(3.14)
-	if got := result.Value(); got != "3.14" {
-		t.Errorf("Sensitive(3.14).Value() = %q, want %q", got, "3.14")
+	if got := result.PlainText(); got != "3.14" {
+		t.Errorf("Sensitive(3.14).PlainText() = %q, want %q", got, "3.14")
 	}
 }
 
@@ -164,6 +266,10 @@ func TestIsSensitiveString_a23eb5b8(t *testing.T) {
 
 	if !IsSensitiveString(ss) {
 		t.Errorf("IsSensitiveString(ss) = false, want true")
+	}
+
+	if !IsSensitiveString(&ss) {
+		t.Errorf("IsSensitiveString(&ss) = false, want true")
 	}
 
 	if IsSensitiveString(s) {
@@ -183,19 +289,20 @@ func TestLen_088caed0(t *testing.T) {
 	}
 }
 
-// TestNilSensitiveString verifies nil pointer handling for pointer-receiver methods.
+// TestNilSensitiveString verifies zero value handling for various methods.
 // String(), GoString(), MarshalJSON(), MarshalYAML(), and LogValue() use value
 // receivers and cannot be called safely on a nil pointer — that is expected Go
-// behavior. Only the pointer-receiver methods (Value, PValue, Len) need nil guards.
+// behavior. PlainText() and Len() use value receivers (safe on nil *SensitiveString).
+// PValue() uses a pointer receiver and panics on a nil *SensitiveString.
 func TestNilSensitiveString(t *testing.T) {
-	var ss *SensitiveString
+	var ss SensitiveString
 
-	if got := ss.Value(); got != "" {
-		t.Errorf("nil.Value() = %v, want empty string", got)
+	if got := ss.PlainText(); got != "" {
+		t.Errorf("zero.PlainText() = %v, want empty string", got)
 	}
 
 	if got := ss.Len(); got != 0 {
-		t.Errorf("nil.Len() = %v, want 0", got)
+		t.Errorf("zero.Len() = %v, want 0", got)
 	}
 }
 
@@ -227,8 +334,8 @@ func Test455A1E09_StringFormatting(t *testing.T) {
 // Test458ECC56_StructSerialization verifies struct fields don't leak
 func Test458ECC56_StructSerialization(t *testing.T) {
 	type Credentials struct {
-		Username string           `json:"username"`
-		Password *SensitiveString `json:"password"`
+		Username string          `json:"username"`
+		Password SensitiveString `json:"password"`
 	}
 
 	creds := Credentials{
@@ -256,10 +363,10 @@ func Test458ECC56_StructSerialization(t *testing.T) {
 // TestC9D43D4F_YAML verifies YAML serialization doesn't leak
 func TestC9D43D4F_YAML(t *testing.T) {
 	type Config struct {
-		Username string           `yaml:"username"`
-		Password *SensitiveString `yaml:"password"`
+		Username string          `yaml:"username"`
+		Password SensitiveString `yaml:"password"`
 		Nested   struct {
-			APIKey *SensitiveString `yaml:"apiKey"`
+			APIKey SensitiveString `yaml:"apiKey"`
 		} `yaml:"nested"`
 	}
 
@@ -376,15 +483,33 @@ func TestPlaintextReplacer_JSON(t *testing.T) {
 	}
 }
 
-// TestPValue_SetValue_b3f7a92c verifies that setting via PValue() is reflected in Value()
+// TestPValue_SetValue_b3f7a92c verifies that setting via PValue() is reflected in PlainText()
 func TestPValue_SetValue_b3f7a92c(t *testing.T) {
 	ss := New("initial")
 
 	*ss.PValue() = "foo"
 
-	if got := ss.Value(); got != "foo" {
-		t.Errorf("Value() after *PValue() = %q = %q, want %q", "foo", got, "foo")
+	if got := ss.PlainText(); got != "foo" {
+		t.Errorf("PlainText() after *PValue() = %q, want %q", got, "foo")
 	}
+}
+
+// TestPValue_NilReceiver_Panics verifies PValue() on a nil *SensitiveString panics.
+func TestPValue_NilReceiver_Panics(t *testing.T) {
+	var s *SensitiveString
+	defer func() {
+		r := recover()
+		if r == nil {
+			t.Error("PValue() on nil *SensitiveString: expected panic, got none")
+			return
+		}
+		want := "PValue: receiver is nil"
+		got, ok := r.(string)
+		if !ok || got != want {
+			t.Errorf("panic = %v (string=%v), want %q", r, ok, want)
+		}
+	}()
+	_ = s.PValue()
 }
 
 // TestPlaintextReplacer_Nil verifies PlaintextReplacer handles nil correctly
@@ -401,11 +526,21 @@ func TestPlaintextReplacer_Nil(t *testing.T) {
 	}
 }
 
+// TestPlaintextReplacer_SensitiveStringPointer verifies PlaintextReplacer on non-nil *SensitiveString.
+func TestPlaintextReplacer_SensitiveStringPointer(t *testing.T) {
+	ss := New("pointer-secret")
+	ptr := &ss
+	got := PlaintextReplacer(ptr)
+	if got != "pointer-secret" {
+		t.Errorf("PlaintextReplacer(&ss) = %v, want pointer-secret", got)
+	}
+}
+
 // slogTestCreds is a helper struct used by slog tests to simulate a real-world
 // struct containing a sensitive field.
 type slogTestCreds struct {
 	Username string
-	Password *SensitiveString
+	Password SensitiveString
 }
 
 const slogTestPlaintext = "slog-secret-plaintext"

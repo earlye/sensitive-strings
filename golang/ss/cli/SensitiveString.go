@@ -1,5 +1,9 @@
 package main
 
+/// coverage-ignore
+// This file is a CLI for the SensitiveString package.
+// It is not covered by tests because it is a simple CLI.
+
 import (
 	"fmt"
 	"os"

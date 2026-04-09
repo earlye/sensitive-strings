@@ -14,8 +14,8 @@ type SensitiveString struct {
 }
 
 // New creates a new SensitiveString from the given value.
-func New(value string) *SensitiveString {
-	return &SensitiveString{value: value}
+func New(value string) SensitiveString {
+	return SensitiveString{value: value}
 }
 
 // String returns the SHA256 hash of the value, implementing fmt.Stringer.
@@ -34,30 +34,27 @@ func (s SensitiveString) GoString() string {
 	return fmt.Sprintf("sensitivestring.SensitiveString{value:%q}", s.String())
 }
 
-// Value returns the raw plaintext value. Use this only when you explicitly
+// PlainText returns the raw plaintext value. Use this only when you explicitly
 // need access to the secret value.
-func (s *SensitiveString) Value() string {
-	if s == nil {
-		return ""
-	}
+func (s SensitiveString) PlainText() string {
 	return s.value
 }
 
 // PValue returns a pointer to the raw plaintext value. Use this when you
 // need to pass plaintext value to a function that expects a string pointer.
 // Common example is for Cobra string arguments.
+// The receiver is a pointer so that the address of `*s.value` is returned rather
+// than the address of a copy.
+// A nil receiver will panic.
 func (s *SensitiveString) PValue() *string {
 	if s == nil {
-		return nil
+		panic("PValue: receiver is nil")
 	}
 	return &s.value
 }
 
 // Len returns the length of the underlying value without exposing it.
-func (s *SensitiveString) Len() int {
-	if s == nil {
-		return 0
-	}
+func (s SensitiveString) Len() int {
 	return len(s.value)
 }
 
@@ -69,8 +66,11 @@ func (s SensitiveString) MarshalJSON() ([]byte, error) {
 }
 
 // UnmarshalJSON implements json.Unmarshaler.
-// Note: This unmarshals the SHA256 hash, not the original value.
+// Note: If the JSON has a hash in it (i.e., it was marshaled with MarshalYAML rather than PlaintextReplacer),
+// this will unmarshal that hash, not the original value.
 // This is intentional - you cannot recover the original value from the hash.
+// The receiver is a pointer so that it can properly implement json.Unmarshaler; it must
+// be a pointer to be able to modify `s`.
 func (s *SensitiveString) UnmarshalJSON(data []byte) error {
 	var str string
 	if err := json.Unmarshal(data, &str); err != nil {
@@ -94,28 +94,32 @@ func (s SensitiveString) LogValue() slog.Value {
 	return slog.StringValue(s.String())
 }
 
-// IsSensitiveString returns true if the input is a *SensitiveString.
-func IsSensitiveString(input interface{}) bool {
+// IsSensitiveString returns true if the input is a SensitiveString or *SensitiveString.
+func IsSensitiveString(input any) bool {
 	if input == nil {
 		return false
 	}
-	_, ok := input.(*SensitiveString)
-	return ok
+	switch input.(type) {
+	case *SensitiveString: // nil *SensitiveString covered by nil check above.
+		return true
+	case SensitiveString:
+		return true
+	}
+	return false
 }
 
-// ExtractValue returns the raw value from a *SensitiveString or string.
+// ExtractPlainText returns the raw value from a *SensitiveString, SensitiveString, or string.
 // If input is nil or not a supported type, returns empty string and false.
-func ExtractValue(input interface{}) (string, bool) {
+func ExtractPlainText(input any) (string, bool) {
 	if input == nil {
 		return "", false
 	}
 
 	switch v := input.(type) {
-	case *SensitiveString:
-		if v == nil {
-			return "", false
-		}
-		return v.Value(), true
+	case *SensitiveString: // nil *SensitiveString covered by nil check above.
+		return v.PlainText(), true
+	case SensitiveString:
+		return v.PlainText(), true
 	case string:
 		return v, true
 	default:
@@ -123,22 +127,22 @@ func ExtractValue(input interface{}) (string, bool) {
 	}
 }
 
-// ExtractRequiredValue returns the raw value from a *SensitiveString or string.
+// ExtractRequiredPlainText returns the raw value from a SensitiveString, *SensitiveString, or string.
 // Panics if input is nil or not a supported type.
-func ExtractRequiredValue(input interface{}) string {
-	value, ok := ExtractValue(input)
+func ExtractRequiredPlainText(input any) string {
+	value, ok := ExtractPlainText(input)
 	if !ok {
-		panic("ExtractRequiredValue: input must be a string or *SensitiveString")
+		panic("ExtractRequiredPlainText: input must be a string, SensitiveString, or *SensitiveString")
 	}
 	return value
 }
 
 // Sensitive converts input into a *SensitiveString.
 // If input is already a *SensitiveString, returns it unchanged.
-// If input is nil, returns nil.
-func Sensitive(input interface{}) *SensitiveString {
+// If input is nil, returns new empty SensitiveString.
+func Sensitive(input any) *SensitiveString {
 	if input == nil {
-		return nil
+		return &SensitiveString{}
 	}
 
 	if ss, ok := input.(*SensitiveString); ok {
@@ -150,13 +154,15 @@ func Sensitive(input interface{}) *SensitiveString {
 	switch v := input.(type) {
 	case string:
 		str = v
+	case SensitiveString:
+		str = v.PlainText()
 	case fmt.Stringer:
 		str = v.String()
 	default:
 		str = fmt.Sprintf("%v", v)
 	}
 
-	return New(str)
+	return &SensitiveString{value: str}
 }
 
 // PlaintextReplacer returns a custom JSON marshaler function that
@@ -166,7 +172,7 @@ func Sensitive(input interface{}) *SensitiveString {
 //
 // Example:
 //
-//	data := map[string]interface{}{
+//	data := map[string]any{
 //	  "username": "user",
 //	  "password": sensitivestring.New("secret123"),
 //	}
@@ -175,21 +181,23 @@ func Sensitive(input interface{}) *SensitiveString {
 //	// To get plaintext:
 //	result := sensitivestring.PlaintextReplacer(data)
 //	json.Marshal(result) // password will be "secret123"
-func PlaintextReplacer(data interface{}) interface{} {
+func PlaintextReplacer(data any) any {
 	switch v := data.(type) {
 	case *SensitiveString:
 		if v == nil {
 			return nil
 		}
-		return v.Value()
-	case map[string]interface{}:
-		result := make(map[string]interface{}, len(v))
+		return v.PlainText()
+	case SensitiveString:
+		return v.PlainText()
+	case map[string]any:
+		result := make(map[string]any, len(v))
 		for key, val := range v {
 			result[key] = PlaintextReplacer(val)
 		}
 		return result
-	case []interface{}:
-		result := make([]interface{}, len(v))
+	case []any:
+		result := make([]any, len(v))
 		for i, val := range v {
 			result[i] = PlaintextReplacer(val)
 		}
